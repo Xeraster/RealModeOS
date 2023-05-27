@@ -1,0 +1,6 @@
+void clearScreen();
+
+void helloWorld()
+{
+
+}
