@@ -958,9 +958,10 @@ callcmd db "call",0,"$"
 pciinfocmd db "pciinfo",0,"$"
 graphicsTest db "gtest",0,"$"
 colorTestcmd db "colortest",0,"$"
-debug1cmd dw "debug1",0,$    ;debug commands for whatever you want them to do
-debug2cmd dw "debug2",0,$
-debug3cmd dw "debug3",0,$
+
+debug1cmd dw "debug1",0,"$"    ;debug commands for whatever you want them to do
+debug2cmd dw "debug2",0,"$"
+debug3cmd dw "debug3",0,"$"
 
 ;extra strings reeeeee
 pcipresent db "pci present: $"

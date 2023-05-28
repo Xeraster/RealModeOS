@@ -1,9 +1,9 @@
-SECTION .text
+;SECTION .text
 [CPU 586];I need this to be a 486 with the cpuid instruction, so setting it to 586 is close enough
+[BITS 16]
 
-;note: CGA AND EGA graphics cards are not supported
-;if anyone is seriously bummed out about that, too bad. ega and cga sucks bad. the vga standard is just a glorified and overly complex framebuffering scheme anyway. 
-;Just connect some discrete logic or a cheap cpld to 2 bank switched ram chips (flip flop each bank between host system and vga monitor control) and put that on an isa or slpc card, you'll get better performance that way anyway
+_begin:
+
 
 ;ORG 7e00h
 ;can't use org when using nasm and elfs
@@ -52,7 +52,6 @@ call printCPUID
 ;mov al, 0Dh
 ;int 10h
 
-;whatever, as retarded as it is, its best to just use the bit mask business instead of bit plane switching
 ;mov cl, 00001111b
 ;call vga_maskMap
 
@@ -109,70 +108,6 @@ call printCPUID
 
 ;call textModeNewLine
 ;call vga_getModeControl
-
-
-;send configuration byte that can enable the mouse
-;call kbd8042WaitWriteReady
-;mov al, 060h    ;configuration byte set command
-;out 064h, al
-;call kbd8042WaitWriteReady
-;mov al, 01000111b       ;set the configuration byte to a thing that should enable the mouse
-;out 064h, al
-
-;call kbd8042WaitWriteReady
-;mov al, 0A9h
-;out 064h, al
-;call kbd8042WaitReadReady
-;in al, 060h
-;call alToScreenHex
-
-;the test results of the 2nd ps2 port should now be on the screen
-;00 means test passed sucessfully
-
-;now, let's enable the 2nd ps2 port and see what happens
-;call kbd8042WaitWriteReady
-;mov al, 0A8h
-;out 064h, al
-;should now be enabled
-
-;print the letter G to let me know where its getting stuck
-;mov al, "G"
-;mov cl, 00000010b
-;call printChar
-
-;send identify command to mouse
-;call kbd8042WaitWriteReady
-;mov al, 0D4h
-;out 064h, al
-
-;print the letter G to let me know where its getting stuck
-;mov al, "G"
-;mov cl, 00000010b
-;call printChar
-
-;call kbd8042WaitWriteReady
-;mov al, 0F4h
-;out 064h, al
-
-;print the letter G to let me know where its getting stuck
-;mov al, "G"
-;mov cl, 00000010b
-;call printChar
-
-;call kbd8042WaitReadReady
-
-;call waitAck
-;in al, 060h
-;call alToScreenHex
-
-;print the letter G to let me know where its getting stuck
-;mov al, "G"
-;mov cl, 00000010b
-;call printChar
-
-;call kbd8042WaitReadReady
-;in al, 060h
-;call alToScreenHex
 call textModeNewLine
 
 ;wait for a keypress before returning to parent subroutine
@@ -333,7 +268,6 @@ setCursorPosBasedOnData:
         
 ;;================================================================================================
 ;      ~Welcome to the cursor positioning code.~ 
-;      The first big fuck of this entire program (and of many to come, I'm sure)
 ;
 ;        ;use 3D4-3D5 to access CRTC registers if in a non-monochrome
 ;        ;3D4 = address
@@ -385,7 +319,7 @@ setCursorPosBasedOnData:
         pop ax
 
         ;=====================================================================
-        ;there. That should hopefully be it. Damn that sucks to write in assembly
+        ;there. That should hopefully be it
         
         
 
@@ -1545,7 +1479,7 @@ cputypek6 db 'K6-II$'
 cputypek6later db 'K6-III$'
 
 cpuwtfcomment db '..wait, what? How the hell did you do that?','$'
-helpmsg db "God DAMN you are stupid.. Here's some commands:$"
+helpmsg db "Wow you are stupid.. Here's some commands:$"
 invalidcommandmsg db "Invalid command. What, are you stupid?$"
 invalidparametersmsg db "Invalid parameters. Type command the right way next time, dumbass.$"
 genericGoFuckYourself db "go fuck yourself because i'm not implementing that idiotic bullshit$"

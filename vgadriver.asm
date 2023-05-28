@@ -20,7 +20,7 @@
 ;   466 = current color
 ;   484 = number of character rows
 
-;none of this stuff was stolen from here (jk it was): https://github.com/kaneton/appendix-bios/blob/master/src/video.asm
+;referenced from here: https://github.com/kaneton/appendix-bios/blob/master/src/video.asm
 
 vga_getModeControl:
 
@@ -425,7 +425,7 @@ vga_screencoordsToNumber_G16:
 
 ret
 
-;ok, time for the 3rd or 4th (haven't been keeping track) big fuck of this whole program: Bresenham's line algorithm
+;Bresenham's line algorithm
 ;https://en.wikipedia.org/wiki/Bresenham%27s_line_algorithm
 ;draws a line in 16 color vga graphics modes
 vga_drawLine_16g:

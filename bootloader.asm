@@ -1,3 +1,5 @@
+[BITS 16]
+[CPU 586]
 ;org 7c00h
 ;can't use org when using nasm and elfs
 
@@ -17,8 +19,10 @@ xor bx, bx
 mov es, bx    ; es should be 0
 mov bx, 7e00h ; 512bytes from origin address 7c00h
 int 13h
-jmp 7e00h     ; jump to the next sector
+jmp _begin     ; jump to the next sector
    
    ; to fill this sector and make it bootable:
    times 510-($-$$) db 0 
    dw 0AA55h
+   times 1024-($-$$) db 0
+%include "BIOS.ASM"
