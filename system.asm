@@ -15,7 +15,7 @@ realmodeosstart:
 
 ;write zeros to the entire screen
 ;call clearScreen
-;clear interupt flag (to prevent dos from fucking this up)
+;clear interupt flag (do this to prevent dos interrupts from ruining everything if running on top of ms-dos)
 cli
 
 ;mov al, 'A'
@@ -199,7 +199,7 @@ printGpuDetection:
         ret
 ret
 
-;check the BDA to figure out if it's a normal keyboard controller or a fucked up one
+;check the BDA to figure out if it's a normal keyboard controller or if the BDA was configured to use a different port
 doKeyboardDetection:
         push ds
         mov ax, 0

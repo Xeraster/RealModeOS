@@ -1,6 +1,6 @@
 ![Alt text](screenshot.png?raw=true "a screenshot of the system when it boots")
 #How to build
-You will need nasm, and that's basically it. Even compiling on Windows shouldn't require any extra effort.
+You will need nasm and if you want to run it without booting it on hardware you need qemu (bochs also works).
 
 Run "sh buildScript.sh".
 
@@ -19,7 +19,7 @@ There's also a way to get basic ata stuff, but if I never write a fat32 file exp
 #Features
 basic vga suppot (mode 3h only)
 v9958 support (only 1 x86 computer with a v9958 video card was ever built and its mine, so this isn't relevant to most people)
-the ability to use ps/2 keyboard controllers at io locations besides 0x60 and 0x64. Modify kbdDataPort and kbdHighPort before compiling if using this, but for 99.9999999% of users its best to leave that setting the way it is. I only made this because I got the bus wiring wrong on that homnebrew 486 system to where the ps/2 was at 0x60 and 0x61 instead of 0x60 and 0x64.
+the ability to use ps/2 keyboard controllers at i/o locations besides 0x60 and 0x64. Modify kbdDataPort and kbdHighPort before compiling if using this, but for 99.9999999% of users its best to leave that setting the way it is. I only made this because I got the bus wiring wrong on that homnebrew 486 system to where the ps/2 was at 0x60 and 0x61 instead of 0x60 and 0x64.
 The text cursor position changing with the arrow keys mostly works.
 
 #Commands

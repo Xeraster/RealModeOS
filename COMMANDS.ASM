@@ -165,7 +165,7 @@ processCommands:
 ret
 
 helpCommand:
-    ;guess fucking what it's time to change the help command to something actually useful
+    ;guess what it's time to change the help command to something actually useful
     mov bx, helpmsg
     mov cl, 00001111b
     call printString
