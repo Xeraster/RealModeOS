@@ -17,10 +17,10 @@ The only reason I still use this is because I have a homebrew x86 computer and t
 There's also a way to get basic ata stuff, but if I never write a fat32 file explorer in assembly again it'll be too soon. (see my z80 kernel)
 
 # Features
-basic vga suppot (mode 3h only)
-v9958 support (only 1 x86 computer with a v9958 video card was ever built and its mine, so this isn't relevant to most people)
-the ability to use ps/2 keyboard controllers at i/o locations besides 0x60 and 0x64. Modify kbdDataPort and kbdHighPort before compiling if using this, but for 99.9999999% of users its best to leave that setting the way it is. I only made this because I got the bus wiring wrong on that homnebrew 486 system to where the ps/2 was at 0x60 and 0x61 instead of 0x60 and 0x64.
-The text cursor position changing with the arrow keys mostly works.
+- basic vga suppot (mode 3h only)
+- v9958 support (only 1 x86 computer with a v9958 video card was ever built and its mine, so this isn't relevant to most people)
+- the ability to use ps/2 keyboard controllers at i/o locations besides 0x60 and 0x64. Modify kbdDataPort and kbdHighPort before compiling if using this, but for 99.9999999% of users its best to leave that setting the way it is. I only made this because I got the bus wiring wrong on that homnebrew 486 system to where the ps/2 was at 0x60 and 0x61 instead of 0x60 and 0x64.
+- The text cursor position changing with the arrow keys mostly works.
 
 # Commands
 There are other mostly useless testing commands but here are the useful ones:
