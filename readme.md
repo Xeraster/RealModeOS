@@ -1,4 +1,4 @@
-![Alt text](screenshot.png?raw=true "a screenshot of the system when it boots")
+![Alt text](realmodeos_screenshot.png?raw=true "a screenshot of the system when it boots")
 #How to build
 You will need nasm and if you want to run it without booting it on hardware you need qemu (bochs also works).
 
