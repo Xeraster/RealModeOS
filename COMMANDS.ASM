@@ -2,14 +2,14 @@
 ;makes bx contain address of vram when a segment register is set to B800
 cursorPosToBx:
 		;calculate the correct line number from cursorY
-        mov al, [cursorY]
+        mov al, [ds:cursorY]            ;changed from [cursorY]
         mov ah, 0
         mov bx, 00A0h
         mul bx
         mov cx, ax
 
         ;add the column number in cursorX to di so that the character prints to the correct column
-        mov al, [cursorX]
+        mov al, [ds:cursorX]            ;changed from [cursorX]
         mov ah, 0
         mov bx, 2
         mul bx
@@ -18,47 +18,35 @@ cursorPosToBx:
         mov bx, cx
 ret
 
+;the commands are fetched from the textmode vram. This is fine on vga text modes, can be hacked to work on v9958 but it won't work on an fpga framebuffer card that only has graphics modes
 lineToCommandBuffer:
 
-    ;calculate the correct line number from cursorY
-    mov al, [cursorY]
-    mov ah, 0
-    mov bx, 00A0h
-    mul bx
-    mov cx, ax
+    mov bx, videoCardType
+    mov al, [ds:bx]
+    cmp al, 0                       ;if card type is 00, its vga. use vga drivers
+    je lineToCommandBufferContinue_Vga
+    cmp al, 1                       ;if card type is 01, its a v9958. use v9958 drivers. Sucks to be you.
+    je lineToCommandBufferContinue_V9958
+    cmp al, 2                       ;if card type is 10, its a ice 40 fpga
+    je lineToCommandBufferContinue_Ice40
+    cmp al, 3                       ;if card type is 11, its vga. use vga drivers
+    jmp lineToCommandBufferContinue_unknown
 
-    ;add the column number in cursorX to di so that the character prints to the correct column
-    mov al, 0
-    mov ah, 0
-    mov bx, 2
-    mul bx
-    add cx, ax
+    lineToCommandBufferContinue_Vga:
+            call vgaVramToCommandBuffer
+            ret
+    lineToCommandBufferContinue_V9958:
+            call VdpVramToCommandBuffer
+            ;call VdpBackspace
+            ;call RowsColumnsToCursorPos     ;keep the cursor up to date. can't remember if that's required here or not
+            ret
+    lineToCommandBufferContinue_Ice40:
+            hlt                             ;nope
+    lineToCommandBufferContinue_unknown:
+            call vgaVramToCommandBuffer             ;meh, it's probably a vga
+            ret
 
-    mov bx, cx
-    mov cx, commandHistory
-
-    lineToCommandBufferCopyLoop:
-    mov al, [es:bx]
-    xchg bx, cx
-    mov [ds:bx], al
-    xchg bx, cx
-    inc cx
-    add bx, 2
-    cmp al, 0
-    jne lineToCommandBufferCopyLoop
-
-    ;done. now copy a null character just because
-    xchg bx, cx
-    ;inc bx
-    mov al, 0
-    mov [ds:bx], al
-
-    ;and then copy a $ character do you can plug this into the print string function
-    inc bx
-    mov al, "$"
-    mov [ds:bx], al
-
-
+    ;there. done
 ret
 
 ;bx = start address of string 1 you want to compare. For example, put a command in this one
@@ -140,40 +128,33 @@ processCommands:
     cmp cl, 1
     je pciinfoCommand
 
-    ;gtest command
+    ;ata test command
     mov ax, commandHistory
-    mov bx, graphicsTest
+    mov bx, atatestcmd
     call doesStringContain
     cmp cl, 1
-    je gtestCommand
+    je ataTestCommand
 
-    ;colortest command
+    ;"stupidtest" command. used for misc quick tests
     mov ax, commandHistory
-    mov bx, colorTestcmd
+    mov bx, stupidtestcmd
     call doesStringContain
     cmp cl, 1
-    je colorTestCommand
+    je stupidTestCommand
 
-    ;debug1 command
+    ;getscancodeset command
     mov ax, commandHistory
-    mov bx, debug1cmd
+    mov bx, getScancodeSetcmd
     call doesStringContain
     cmp cl, 1
-    je debug1Command
+    je getscancodeset
 
-    ;debug2 command
+    ;g4test command
     mov ax, commandHistory
-    mov bx, debug2cmd
+    mov bx, G4TestCommand
     call doesStringContain
     cmp cl, 1
-    je debug2Command
-
-    ;debug3 command
-    mov ax, commandHistory
-    mov bx, debug3cmd
-    call doesStringContain
-    cmp cl, 1
-    je debug3Command
+    je g4TestCommand
 
     ;if it go to this point, the user didn't type a real command. Print the error message
     mov bx, invalidcommandmsg
@@ -225,24 +206,18 @@ helpCommand:
     call printString
     call textModeNewLine
 
-    mov bx, graphicsTest
-    mov cl, 00001111b
-    call printString
-    call textModeNewLine
-
-    mov bx, colorTestcmd
-    mov cl, 00001111b
-    call printString
-    call textModeNewLine
-
 ret
 
-readcmdinfo db "proper usage of this command is: 'read xxxx:xxxx' where x is a hexadecimal number between 0-F$"
+readcmdinfo db "proper usage of this command is: 'read xxxx:xxxx' where x is a hexadecimal number between 0-F",0
 readCommandSpacesPerRow equ 0x10        ;max number of spaces per row
 remainingLinesToPrint db 0
 readCommandLinesToPrint equ 16
 ;the all important hex reader command
 readCommand:
+    ;disable the v9958 cursor because it's slower than slow
+    mov al, 1
+    mov [es:RowsColumnsToCursorPosDisable], al
+
     mov bx, remainingLinesToPrint
     mov al, readCommandLinesToPrint
     mov [ds:bx], al
@@ -419,6 +394,10 @@ readCommand:
     ;call printString
     ;call textModeNewLine
 
+    ;enable the v9958 cursor again
+    mov al, 0
+    mov [es:RowsColumnsToCursorPosDisable], al
+    call calculateCursorValues                      ;recalculate cursor here in case it was running on v9958. on vga this will be so fast it doesn't matter and break nothing
     ret
 
     ;error. remind user how to use this command
@@ -428,6 +407,10 @@ readCommand:
     call printString
     call textModeNewLine
 
+    ;enable the v9958 cursor again
+    mov al, 0
+    mov [es:RowsColumnsToCursorPosDisable], al
+
     mov bx, readcmdinfo
     mov cl, 00001111b
     call printString
@@ -436,8 +419,8 @@ readCommand:
 
 ret
 
-writeCommandErrorString db "Hey asshole, that isn't how you use the write command. The syntax is 'write xxxx:xxxx xx'$"
-writeCommandErrorStringAlmost db "Close, but you forgot to enter a byte to write. Try 'write 0000:8A00 AA'$"
+writeCommandErrorString db "Hey asshole, that isn't how you use the write command. The syntax is 'write xxxx:xxxx xx'",0
+writeCommandErrorStringAlmost db "Close, but you forgot to enter a byte to write. Try 'write 0000:8A00 AA'",0
 ;write a byte to manually inputted location in memory$"
 writeCommand:
     ;mov bx, genericGoFuckYourself
@@ -532,17 +515,13 @@ ret
 clearScreenCommand:
 
     call setupBlankScreen
-    mov cl, 0
-    call setCurX
-    mov cl, 0
-    call setCurY
     call calculateCursorValues
 
 ret
 
 jmpValueLow dw 0x0000       ;offset
 jmpValueHigh dw 0x0000      ;segment
-jmpCommandError db "Guess what dumbass? You typed it wrong. Im not gonna give you any useful help though so get REKT.$"
+jmpCommandError db "Guess what dumbass? You typed it wrong. Im not gonna give you any useful help though so get REKT.",0
 jmpCommand:
 
     ;first, check if user put in a valid segment
@@ -770,184 +749,146 @@ pciinfoCommand:
 
 ret
 
-;in gtest, switch to a graphics mode and switch back to text mode when user presses esc
-gtestCommand:
+ataTestCommand:
+    mov cl, 0x0F
+    mov bx, ataCommandInit
+    call printString
+    call textModeNewLine
 
-    ;set graphics mode to mode 10h
-    ;remember 10h and 12h use bit planes
-    ;mode 13h doesn't use that bit plane crap but its only 320x200
-    mov ah, 00h
-    mov al, 0Dh
-    int 10h
+    pushad
+    push es
+    push di
+        mov ax, 0x1000
+        mov es, ax
+        mov eax, 1
+        ;;mov cl, 3 ;reading more than 1 sector is broken and fixing it has proven to be too hard
+        mov di, 0
+        call ata_lba_read
+    pop di
+    pop es
+    popad
 
-    ;draw some test points
-    mov ax, 76
-    mov [ds:xPosDrawRect], ax
-    mov ax, 5
-    mov [ds:yPosDrawRect], ax
-    mov cl, 00001111b
-    call vga_drawPoint
-
-    mov ax, 77
-    mov [ds:xPosDrawRect], ax
-    mov ax, 4
-    mov [ds:yPosDrawRect], ax
-    mov cl, 00001111b
-    call vga_drawPoint
-
-    mov ax, 81
-    mov [ds:xPosDrawRect], ax
-    mov ax, 4
-    mov [ds:yPosDrawRect], ax
-    mov cl, 00001111b
-    call vga_drawPoint
-
-    mov ax, 85
-    mov [ds:xPosDrawRect], ax
-    mov ax, 4
-    mov [ds:yPosDrawRect], ax
-    mov cl, 00001111b
-    call vga_drawPoint
-
-    call waitKey            ;wait for the user to press any key
-
-    ;the following code generally switches back to 03h 16 color text mode pretty reliably
-    mov ah, 00h
-    mov al, 03h
-    int 10h
-    call setupBlankScreen
-    mov ax, 0B800h
-    mov es, ax
-
-ret
-
-colorTestCommand:
-    ;loop through all 16 mode 03h colors
-    mov cl, 0
-    mov al, "0"
-    mov bx, 0
-
-    colorTestCommandLoop:
+    ;there. the first sector of the disk is in memory starting at location 0x10000 probably
+    ;print all the partition entries
+    
+    ;push ds
+    mov cl, 16
+    mov ax, 0x1000
+    mov gs, ax
+    mov bx, 0x1CD
+    ;mov bx, 0x0F
+    ataTestCommand_loop1:
+        ;read 16 bytes
+        ;damn I remember why I hate x86 assembly now
         push ax
         push cx
-        push bx
-            call printChar
-            call textModeNewLine
-        pop bx
+            mov al, [gs:bx]
+            call alToScreenHex
+            ;mov al, ' '
+            ;call printChar
         pop cx
         pop ax
+        dec cl
+        dec bx
+        cmp cl, 0
+        jne ataTestCommand_loop1
+    ;pop ds
 
-        inc bx
-        inc cl
-        inc al
-
-        cmp al, ":"
-        jne colorTestCommandLoop_continue
-        colorTestCommandLoop_switchToA:
-        mov al, "A"
-        colorTestCommandLoop_continue:
-        cmp bx, 16
-        jne colorTestCommandLoop
-
-    colorTestCommandLoopEnd:
-ret
-
-
-debug1Command:
-    mov al, [ds:vga_drawPoint_debugByte1]
-    call alToScreenHex
-
-    call textModeNewLine
-ret
-
-debug2Command:
-    mov bx, vga_drawPoint_debugWord3
-    mov al, [ds:bx]
-    push bx
-    call alToScreenHex
-    pop bx
-    inc bx
-    mov al, [ds:bx]
-    push bx
-    call alToScreenHex
-    pop bx
-    inc bx
-    mov al, [ds:bx]
-    push bx
-    call alToScreenHex
-    pop bx
-    inc bx
-    mov al, [ds:bx]
-    push bx
-    call alToScreenHex
-    pop bx
-
-    call textModeNewLine
-
-    mov bx, vga_drawPoint_debugWord4
-    mov al, [ds:bx]
-    push bx
-    call alToScreenHex
-    pop bx
-    inc bx
-    mov al, [ds:bx]
-    push bx
-    call alToScreenHex
-    pop bx
-    inc bx
-    mov al, [ds:bx]
-    push bx
-    call alToScreenHex
-    pop bx
-    inc bx
-    mov al, [ds:bx]
-    push bx
-    call alToScreenHex
-    pop bx
-
-    call textModeNewLine
-
-    mov bx, vga_drawPoint_debugWord5
-    mov al, [ds:bx]
-    push bx
-    call alToScreenHex
-    pop bx
-    inc bx
-    mov al, [ds:bx]
-    push bx
-    call alToScreenHex
-    pop bx
-
-    call textModeNewLine
-ret
-
-debug3Command:
-    ;mov bx, 0449h
-    ;mov al, [ds:bx]
+    ;mov al, 4
+    ;mov cl, 0x0F
     ;call alToScreenHex
-    ;call textModeNewLine
-    mov bx, vga_drawPoint_debugWord1
-    mov al, [ds:bx]
-    push bx
-    call alToScreenHex
-    pop bx
-    inc bx
-    mov al, [ds:bx]
-    call alToScreenHex
 
-    call textModeNewLine
-
-    mov bx, vga_drawPoint_debugWord2
-    mov al, [ds:bx]
-    push bx
-    call alToScreenHex
-    pop bx
-    inc bx
-    mov al, [ds:bx]
-    call alToScreenHex
-
-    call textModeNewLine
 ret
+
+stupidTestCommand:
+    ;LOL THERE ISNT A WAY TO PRINT INTEGERS. FFFFFFFFFUUUUUUUUUUUUUU...
+    ;there is at least a way to print values as hex. close enough
+    mov bx, 0
+    stupidContinue:
+    inc bx
+    cmp bx, 0xFFFF
+    jne stupidContinue
+
+    push bx
+    call textModeNewLine
+    pop bx
+
+    ;print wtf is in bx
+    push bx
+        xchg bl, bh
+        mov al, bl
+        call alToScreenHex
+    pop bx
+    mov al, bl
+    call alToScreenHex
+
+    call textModeNewLine
+
+ret
+
+;send a command to the keyboard to get the scan code set
+getscancodeset:
+    ;send the scancode command 0xF0
+    call kbd8042WaitWriteReady
+    mov al, 0xF0
+    out 0x60, al
+
+    ;wait for the acknoledge byte
+    call waitAck
+
+    ;send value 0 for the "get scancode set" sub command
+    call kbd8042WaitWriteReady
+    mov al, 0
+    out 0x60, al
+
+    ;wait for ack
+    call waitAck
+
+    ;hopefully this will get me a value or something
+    call kbd8042WaitReadReady
+    in al, 0x60
+
+    ;wow does this function work? Everything I ever make has an "alToScreenHex" subroutine so it's easy to lose track
+    call alToScreenHex
+ret
+
+;set it to a different scancode, 1 2 or 3. use al
+setscancodeset:
+    mov al, 3
+    push ax
+        ;send the scancode command 0xF0
+        call kbd8042WaitWriteReady
+        mov al, 0xF0
+        out 0x60, al
+
+        ;wait for the acknoledge byte
+        call waitAck
+
+        ;send value 0 for the "get scancode set" sub command
+        call kbd8042WaitWriteReady
+    pop ax
+    out 0x60, al
+ret
+
+g4TestErrorString db "This command only works with v9958 graphics.",0
+g4TestCommand:
+    ;if this value is anything other than 1, there isn't a v9958 connected to the system
+    mov bx, videoCardType
+    mov al, [ds:bx]
+    cmp al, 1
+    jne g4TestCommandGTFO       ;only do this is v9958
+    g4TestCommandContinue:
+        ;do stuff
+        call setupG4Mode
+        call v9958BasicG4Test
+    ret
+    g4TestCommandGTFO:
+        mov bx, g4TestErrorString
+        mov cl, 00001111b
+        call printString
+        call textModeNewLine
+ret
+
 ;commands
 helpcmd db "help",0,"$"
 readcmd db "read",0,"$"
@@ -956,19 +897,18 @@ clearcmd db "clear",0,"$"
 jmpcmd db "jump",0,"$"
 callcmd db "call",0,"$"
 pciinfocmd db "pciinfo",0,"$"
-graphicsTest db "gtest",0,"$"
-colorTestcmd db "colortest",0,"$"
-
-debug1cmd dw "debug1",0,"$"    ;debug commands for whatever you want them to do
-debug2cmd dw "debug2",0,"$"
-debug3cmd dw "debug3",0,"$"
+atatestcmd db "atatest",0,"$"
+stupidtestcmd db "stupidtest",0,"$"
+getScancodeSetcmd db "getscancodeset",0,"$"                 ;whatever the default one qemu uses is what I want my homebrew 486 computer to use
+G4TestCommand db "g4test",0                                 ;test graphics 4 mode when plugged in to a v9958
 
 ;extra strings reeeeee
-pcipresent db "pci present: $"
-pcimech db "pci mechanism: $"
-mjver db "major version: $"
-mnver db "minor version: $"
-lastpcibus db "num buses: $"
+pcipresent db "pci present: ",0
+pcimech db "pci mechanism: ",0
+mjver db "major version: ",0
+mnver db "minor version: ",0
+lastpcibus db "num buses: ",0
+ataCommandInit db "Welcome to the ata test command",0
 
 hexReadValueLow dw 0x0000       ;offset
 hexReadValueHigh dw 0x0000      ;segment\
